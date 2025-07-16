@@ -2,7 +2,7 @@
 A Go library that routes LLM requests across multiple providers to maximize free tier usage and stay within API quotas.
 
 ## What it does
-This library helps you manage multiple LLM API providers (like Gemini, OpenRouter, etc.) by automatically routing requests to available providers based on their remaining quota. When one provider hits its daily limit, it will fall back to the next available provider.  It's up to you to provide valid free models to the OpenRouter provider!
+This library helps you manage multiple LLM API providers (like Gemini, OpenRouter, etc.) by automatically routing requests to available providers based on their remaining quota. When one provider hits its daily limit, it will fall back to the next available provider.  It's up to you to provide valid models to each provider
 
 ## Installation
 
@@ -80,6 +80,7 @@ Each provider accepts a slice of models and will try them in order until one suc
 - If the first model fails (API error, rate limit, etc.), it automatically tries the next model
 - This handles temporary issues with specific models or providers
 - Example: `[]string{"gemini-pro", "gemini-pro-vision"}` - if `gemini-pro` fails, it tries `gemini-pro-vision`
+- If you would prefer to use quota-based fallback instead, simply pass in a copy of the Gemini provider as a new provider to the router with the specified model.
 
 ### 2. Router-Level Fallback (Provider Fallback)
 The router tries each provider in order until one succeeds:
@@ -126,6 +127,5 @@ router, err := gollmrouter.NewRouter(myCustomProvider, geminiProvider)
 
 ## Supported Providers
 - **Google Gemini**: Direct API integration with quota management
-- **OpenRouter**: OpenAI-compatible API gateway with access to multiple models
-- **Extensible**: Easy to add new providers by implementing the Provider interface
-# Test commit
+- **OpenRouter**: OpenAI-compatible API gateway with access to multiple models (check OpenRouter for a list of available free models!)
+
