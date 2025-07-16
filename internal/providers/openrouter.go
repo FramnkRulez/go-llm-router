@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/FramnkRulez/go-llm-router/internal/httpclient"
+	"github.com/FramnkRulez/go-llm-router/provider"
 )
 
 // OpenRouterProvider implements the Provider interface for OpenRouter API
@@ -26,10 +27,10 @@ type OpenRouterProvider struct {
 	lastReset        time.Time
 }
 
-var _ Provider = (*OpenRouterProvider)(nil)
+var _ provider.Provider = (*OpenRouterProvider)(nil)
 
 // newOpenRouterProvider creates a new OpenRouter provider
-func newOpenRouterProvider(apiKey string, url string, timeout time.Duration, models []string, referer string, xTitle string, httpClient httpclient.Client, maxDailyRequests int) (Provider, error) {
+func newOpenRouterProvider(apiKey string, url string, timeout time.Duration, models []string, referer string, xTitle string, httpClient httpclient.Client, maxDailyRequests int) (provider.Provider, error) {
 	return &OpenRouterProvider{
 		url:              url,
 		apiKey:           apiKey,
@@ -45,7 +46,7 @@ func newOpenRouterProvider(apiKey string, url string, timeout time.Duration, mod
 }
 
 // Query sends a prompt to OpenRouter and returns the response
-func (o *OpenRouterProvider) Query(ctx context.Context, messages []Message, temperature float64, forceModel string) (string, string, error) {
+func (o *OpenRouterProvider) Query(ctx context.Context, messages []provider.Message, temperature float64, forceModel string) (string, string, error) {
 	var outerErr error
 
 	if time.Since(o.lastReset) > 24*time.Hour {

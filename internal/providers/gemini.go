@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FramnkRulez/go-llm-router/provider"
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
 )
@@ -19,10 +20,10 @@ type GeminiProvider struct {
 	lastReset        time.Time
 }
 
-var _ Provider = (*GeminiProvider)(nil)
+var _ provider.Provider = (*GeminiProvider)(nil)
 
 // newGeminiProvider creates a new Gemini provider
-func newGeminiProvider(apiKey string, models []string, maxDailyRequests int) (Provider, error) {
+func newGeminiProvider(apiKey string, models []string, maxDailyRequests int) (provider.Provider, error) {
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
@@ -40,7 +41,7 @@ func newGeminiProvider(apiKey string, models []string, maxDailyRequests int) (Pr
 }
 
 // Query sends a prompt to Gemini and returns the response
-func (g *GeminiProvider) Query(ctx context.Context, messages []Message, temperature float64, forceModel string) (string, string, error) {
+func (g *GeminiProvider) Query(ctx context.Context, messages []provider.Message, temperature float64, forceModel string) (string, string, error) {
 	if time.Since(g.lastReset) > 24*time.Hour {
 		g.requestsToday = 0
 		g.lastReset = time.Now().Truncate(24 * time.Hour)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/FramnkRulez/go-llm-router/internal/httpclient"
 	"github.com/FramnkRulez/go-llm-router/internal/providers"
+	"github.com/FramnkRulez/go-llm-router/provider"
 )
 
 // GeminiConfig holds configuration for creating a Gemini provider
@@ -26,7 +27,7 @@ type OpenRouterConfig struct {
 }
 
 // NewGeminiProvider creates a new Gemini provider with the given configuration
-func NewGeminiProvider(config GeminiConfig) (providers.Provider, error) {
+func NewGeminiProvider(config GeminiConfig) (provider.Provider, error) {
 	return providers.NewGeminiProvider(
 		config.APIKey,
 		config.Models,
@@ -35,7 +36,7 @@ func NewGeminiProvider(config GeminiConfig) (providers.Provider, error) {
 }
 
 // NewOpenRouterProvider creates a new OpenRouter provider with the given configuration
-func NewOpenRouterProvider(config OpenRouterConfig) (providers.Provider, error) {
+func NewOpenRouterProvider(config OpenRouterConfig) (provider.Provider, error) {
 	httpClient := httpclient.New("go-llm-router/1.0")
 
 	return providers.NewOpenRouterProvider(
