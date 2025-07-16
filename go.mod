@@ -1,6 +1,6 @@
 module github.com/FramnkRulez/go-llm-router
 
-go 1.24
+go 1.21
 
 require (
 	github.com/google/generative-ai-go v0.1.0

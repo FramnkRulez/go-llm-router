@@ -1,5 +1,8 @@
-// Package go-llm-router provides a simple router for calling different LLM APIs
+// Package gollmrouter provides a simple router for calling different LLM APIs
 // to stay within quota limits by rotating through available providers.
+//
+// The router supports automatic fallback between providers and models,
+// making it easy to maximize usage of free tiers across multiple LLM services.
 package gollmrouter
 
 import (
@@ -9,18 +12,23 @@ import (
 	"github.com/FramnkRulez/go-llm-router/internal/providers"
 )
 
-// Message represents a chat message with role and content
+// Message represents a chat message with role and content.
+// This follows the standard chat completion format used by most LLM APIs.
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string `json:"role"`    // "user", "assistant", or "system"
+	Content string `json:"content"` // The message content
 }
 
-// Router manages multiple LLM providers and routes requests to available ones
+// Router manages multiple LLM providers and routes requests to available ones.
+// It automatically handles fallback between providers based on quota availability
+// and request success/failure.
 type Router struct {
 	providers []providers.Provider
 }
 
-// NewRouter creates a new router with the specified providers
+// NewRouter creates a new router with the specified providers.
+// Providers will be tried in the order they are passed to this function.
+// At least one provider must be specified.
 func NewRouter(providers ...providers.Provider) (*Router, error) {
 	if len(providers) == 0 {
 		return nil, fmt.Errorf("no providers configured")
@@ -31,7 +39,19 @@ func NewRouter(providers ...providers.Provider) (*Router, error) {
 	}, nil
 }
 
-// Query sends a prompt to available LLM providers and returns the first successful response
+// Query sends a prompt to available LLM providers and returns the first successful response.
+// It automatically handles fallback between providers and models within each provider.
+//
+// Parameters:
+//   - ctx: Context for the request
+//   - messages: Array of chat messages to send
+//   - temperature: Controls randomness (0.0 = deterministic, 1.0 = very random)
+//   - forceModel: If specified, forces use of this specific model (optional)
+//
+// Returns:
+//   - response: The generated text response
+//   - model: The name of the model that generated the response
+//   - error: Any error that occurred (nil if successful)
 func (r *Router) Query(ctx context.Context, messages []Message, temperature float64, forceModel string) (string, string, error) {
 	// Convert messages to provider format
 	providerMessages := make([]providers.Message, len(messages))
@@ -55,7 +75,9 @@ func (r *Router) Query(ctx context.Context, messages []Message, temperature floa
 	return "", "", fmt.Errorf("no provider available or all providers failed")
 }
 
-// HasRemainingRequests checks if any provider has remaining requests
+// HasRemainingRequests checks if any provider has remaining requests.
+// This can be used to check if the router can handle new requests
+// before actually making them.
 func (r *Router) HasRemainingRequests(ctx context.Context) bool {
 	for _, provider := range r.providers {
 		if provider.HasRemainingRequests(ctx) {
@@ -65,7 +87,8 @@ func (r *Router) HasRemainingRequests(ctx context.Context) bool {
 	return false
 }
 
-// Close closes all providers
+// Close closes all providers and releases any resources they hold.
+// This should be called when you're done using the router.
 func (r *Router) Close() {
 	for _, provider := range r.providers {
 		provider.Close()
