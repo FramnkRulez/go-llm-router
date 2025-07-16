@@ -49,6 +49,47 @@ jobs:
         echo "New version: $NEW_VERSION"
         echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get the latest tag
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+        echo "Latest tag: $LATEST_TAG"
+        
+        # Get commits since last tag
+        COMMITS=$(git log --oneline --no-merges $LATEST_TAG..HEAD)
+        
+        if [ -z "$COMMITS" ]; then
+          CHANGELOG="## Changes since last release:\n- No new commits found"
+        else
+          CHANGELOG="## Changes since last release:\n\n### Commits:\n"
+          while IFS= read -r commit; do
+            if [ ! -z "$commit" ]; then
+              CHANGELOG="$CHANGELOG\n- $commit"
+            fi
+          done <<< "$COMMITS"
+        fi
+        
+        # Try to get PR information using GitHub CLI if available
+        if command -v gh &> /dev/null; then
+          PRS=$(gh pr list --state merged --base main --limit 10 --json number,title,url,mergedAt)
+          if [ ! -z "$PRS" ] && [ "$PRS" != "[]" ]; then
+            CHANGELOG="$CHANGELOG\n\n### Merged Pull Requests:\n"
+            echo "$PRS" | jq -r '.[] | "- #\(.number) \(.title) (\(.url))"' >> /tmp/prs.txt
+            if [ -f /tmp/prs.txt ]; then
+              while IFS= read -r pr; do
+                if [ ! -z "$pr" ]; then
+                  CHANGELOG="$CHANGELOG\n$pr"
+                fi
+              done < /tmp/prs.txt
+            fi
+          fi
+        fi
+        
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
     - name: Create tag
       run: |
         git config --local user.email "action@github.com"
@@ -73,7 +114,6 @@ jobs:
           go get github.com/FramnkRulez/go-llm-router@${{ steps.version.outputs.version }}
           ```
           
-          ### Changes since last release:
-          - Automated release from main branch
+          ${{ steps.changelog.outputs.changelog }}
         draft: false
         prerelease: false 
