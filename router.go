@@ -5,9 +5,7 @@ package gollmrouter
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/FramnkRulez/go-llm-router/internal/httpclient"
 	"github.com/FramnkRulez/go-llm-router/internal/providers"
 )
 
@@ -22,71 +20,14 @@ type Router struct {
 	providers []providers.Provider
 }
 
-// Config holds configuration for creating a new router
-type Config struct {
-	// Gemini configuration
-	GeminiAPIKey       string
-	GeminiModels       []string
-	GeminiMaxDailyReqs int
-
-	// OpenRouter configuration
-	OpenRouterAPIKey       string
-	OpenRouterURL          string
-	OpenRouterModels       []string
-	OpenRouterMaxDailyReqs int
-	OpenRouterReferer      string
-	OpenRouterXTitle       string
-	OpenRouterTimeout      time.Duration
-
-	// HTTP client configuration
-	HTTPTimeout time.Duration
-	UserAgent   string
-}
-
-// NewRouter creates a new router with the specified configuration
-func NewRouter(config Config) (*Router, error) {
-	var provs []providers.Provider
-
-	// Create HTTP client
-	httpClient := httpclient.New(config.UserAgent)
-
-	// Add Gemini provider if configured
-	if config.GeminiAPIKey != "" {
-		geminiProvider, err := providers.NewGeminiProvider(
-			config.GeminiAPIKey,
-			config.GeminiModels,
-			config.GeminiMaxDailyReqs,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create Gemini provider: %w", err)
-		}
-		provs = append(provs, geminiProvider)
-	}
-
-	// Add OpenRouter provider if configured
-	if config.OpenRouterAPIKey != "" {
-		openRouterProvider, err := providers.NewOpenRouterProvider(
-			config.OpenRouterAPIKey,
-			config.OpenRouterURL,
-			config.OpenRouterTimeout,
-			config.OpenRouterModels,
-			config.OpenRouterReferer,
-			config.OpenRouterXTitle,
-			httpClient,
-			config.OpenRouterMaxDailyReqs,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create OpenRouter provider: %w", err)
-		}
-		provs = append(provs, openRouterProvider)
-	}
-
-	if len(provs) == 0 {
+// NewRouter creates a new router with the specified providers
+func NewRouter(providers ...providers.Provider) (*Router, error) {
+	if len(providers) == 0 {
 		return nil, fmt.Errorf("no providers configured")
 	}
 
 	return &Router{
-		providers: provs,
+		providers: providers,
 	}, nil
 }
 

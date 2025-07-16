@@ -6,8 +6,7 @@ import (
 )
 
 func TestRouter_NoProviders(t *testing.T) {
-	config := Config{}
-	_, err := NewRouter(config)
+	_, err := NewRouter()
 	if err == nil {
 		t.Fatal("expected error when no providers are configured")
 	}
