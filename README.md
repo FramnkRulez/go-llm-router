@@ -1,4 +1,9 @@
 # go-llm-router
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/FramnkRulez/go-llm-router.svg)](https://pkg.go.dev/github.com/FramnkRulez/go-llm-router)
+[![Go Report Card](https://goreportcard.com/badge/github.com/FramnkRulez/go-llm-router)](https://goreportcard.com/report/github.com/FramnkRulez/go-llm-router)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A Go library that routes LLM requests across multiple providers to maximize free tier usage and stay within API quotas.
 
 ## What it does
@@ -6,8 +11,53 @@ This library helps you manage multiple LLM API providers (like Gemini, OpenRoute
 
 ## Installation
 
-```
+```bash
 go get github.com/FramnkRulez/go-llm-router
+```
+
+## Quick Start
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	gollmrouter "github.com/FramnkRulez/go-llm-router"
+)
+
+func main() {
+	// Create Gemini provider
+	geminiProvider, _ := gollmrouter.NewGeminiProvider(gollmrouter.GeminiConfig{
+		APIKey:       "your-gemini-api-key",
+		Models:       []string{"gemini-pro", "gemini-pro-vision"},
+		MaxDailyReqs: 100,
+	})
+
+	// Create OpenRouter provider
+	openRouterProvider, _ := gollmrouter.NewOpenRouterProvider(gollmrouter.OpenRouterConfig{
+		APIKey:       "your-openrouter-api-key",
+		URL:          "https://openrouter.ai/api/v1/chat/completions",
+		Models:       []string{"openai/gpt-3.5-turbo", "anthropic/claude-3-haiku"},
+		MaxDailyReqs: 100,
+		Referer:      "your-app",
+		XTitle:       "your-title",
+		Timeout:      30 * time.Second,
+	})
+
+	// Create router with providers
+	router, _ := gollmrouter.NewRouter(geminiProvider, openRouterProvider)
+	defer router.Close()
+
+	// Use the router
+	response, model, _ := router.Query(context.Background(), []gollmrouter.Message{
+		{Role: "user", Content: "Hello, who are you?"},
+	}, 0.7, "")
+
+	fmt.Printf("Model: %s\nResponse: %s\n", model, response)
+}
 ```
 
 ## Usage Example
@@ -128,4 +178,9 @@ router, err := gollmrouter.NewRouter(myCustomProvider, geminiProvider)
 - **Google Gemini**: Direct API integration with quota management
 - **OpenRouter**: OpenAI-compatible API gateway with access to multiple models
 - **Extensible**: Easy to add new providers by implementing the Provider interface
-# Test commit
+
+## Keywords
+LLM, AI, Router, Fallback, Quota Management, Gemini, OpenRouter, OpenAI, Claude, API, Go, Golang, Library
+
+## License
+MIT
