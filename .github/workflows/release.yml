@@ -51,6 +51,8 @@ jobs:
 
     - name: Generate changelog
       id: changelog
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         # Get the latest tag
         LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
