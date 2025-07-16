@@ -9,27 +9,20 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FramnkRulez/go-llm-router/internal/providers"
+	"github.com/FramnkRulez/go-llm-router/provider"
 )
-
-// Message represents a chat message with role and content.
-// This follows the standard chat completion format used by most LLM APIs.
-type Message struct {
-	Role    string `json:"role"`    // "user", "assistant", or "system"
-	Content string `json:"content"` // The message content
-}
 
 // Router manages multiple LLM providers and routes requests to available ones.
 // It automatically handles fallback between providers based on quota availability
 // and request success/failure.
 type Router struct {
-	providers []providers.Provider
+	providers []provider.Provider
 }
 
 // NewRouter creates a new router with the specified providers.
 // Providers will be tried in the order they are passed to this function.
 // At least one provider must be specified.
-func NewRouter(providers ...providers.Provider) (*Router, error) {
+func NewRouter(providers ...provider.Provider) (*Router, error) {
 	if len(providers) == 0 {
 		return nil, fmt.Errorf("no providers configured")
 	}
@@ -52,11 +45,11 @@ func NewRouter(providers ...providers.Provider) (*Router, error) {
 //   - response: The generated text response
 //   - model: The name of the model that generated the response
 //   - error: Any error that occurred (nil if successful)
-func (r *Router) Query(ctx context.Context, messages []Message, temperature float64, forceModel string) (string, string, error) {
+func (r *Router) Query(ctx context.Context, messages []provider.Message, temperature float64, forceModel string) (string, string, error) {
 	// Convert messages to provider format
-	providerMessages := make([]providers.Message, len(messages))
+	providerMessages := make([]provider.Message, len(messages))
 	for i, msg := range messages {
-		providerMessages[i] = providers.Message{
+		providerMessages[i] = provider.Message{
 			Role:    msg.Role,
 			Content: msg.Content,
 		}
