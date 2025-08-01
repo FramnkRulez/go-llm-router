@@ -37,7 +37,7 @@ func NewRouter(providers ...provider.Provider) (*Router, error) {
 //
 // Parameters:
 //   - ctx: Context for the request
-//   - messages: Array of chat messages to send
+//   - messages: Array of chat messages to send (can include file attachments)
 //   - temperature: Controls randomness (0.0 = deterministic, 1.0 = very random)
 //   - forceModel: If specified, forces use of this specific model (optional)
 //
@@ -46,13 +46,16 @@ func NewRouter(providers ...provider.Provider) (*Router, error) {
 //   - model: The name of the model that generated the response
 //   - error: Any error that occurred (nil if successful)
 func (r *Router) Query(ctx context.Context, messages []provider.Message, temperature float64, forceModel string) (string, string, error) {
-	// Convert messages to provider format
+	// Convert messages to provider format (including file attachments)
 	providerMessages := make([]provider.Message, len(messages))
 	for i, msg := range messages {
 		providerMessages[i] = provider.Message{
 			Role:    msg.Role,
 			Content: msg.Content,
+			Files:   make([]provider.File, len(msg.Files)),
 		}
+		// Copy file attachments
+		copy(providerMessages[i].Files, msg.Files)
 	}
 
 	for _, provider := range r.providers {

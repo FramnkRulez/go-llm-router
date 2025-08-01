@@ -56,13 +56,38 @@ func (g *GeminiProvider) Query(ctx context.Context, messages []provider.Message,
 	for _, model := range modelsToUse {
 		geminiModel := g.client.GenerativeModel(model)
 
-		textPrompts := []genai.Part{}
+		// Convert messages to Gemini format with support for files
+		allParts := make([]genai.Part, 0)
 		for _, message := range messages {
-			textPrompts = append(textPrompts, genai.Text(message.Content))
+			// Add text content if present
+			if message.Content != "" {
+				allParts = append(allParts, genai.Text(message.Content))
+			}
+
+			// Add file attachments if present
+			for _, file := range message.Files {
+				switch file.Type {
+				case "image":
+					// Handle image files
+					imgPart := genai.ImageData(file.MimeType, file.Data)
+					allParts = append(allParts, imgPart)
+				case "document":
+					// Handle document files (PDF, etc.)
+					// Note: Gemini has limited document support, mainly for images
+					// For now, we'll skip document files that aren't images
+					if file.MimeType == "application/pdf" {
+						// PDFs need special handling - skip for now
+						continue
+					}
+				default:
+					// Skip unsupported file types
+					continue
+				}
+			}
 		}
 
 		var resp *genai.GenerateContentResponse
-		resp, err = geminiModel.GenerateContent(ctx, textPrompts...)
+		resp, err = geminiModel.GenerateContent(ctx, allParts...)
 		if err != nil {
 			continue
 		}
