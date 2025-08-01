@@ -3,6 +3,7 @@ package providers
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -60,9 +61,49 @@ func (o *OpenRouterProvider) Query(ctx context.Context, messages []provider.Mess
 	}
 
 	for _, model := range modelsToUse {
+		// Convert messages to OpenRouter format with file support
+		openRouterMessages := make([]map[string]interface{}, 0, len(messages))
+		for _, message := range messages {
+			msg := map[string]interface{}{
+				"role": message.Role,
+			}
+
+			// Handle content and files
+			if len(message.Files) > 0 {
+				// If we have files, we need to use the content array format
+				content := make([]map[string]interface{}, 0)
+
+				// Add text content if present
+				if message.Content != "" {
+					content = append(content, map[string]interface{}{
+						"type": "text",
+						"text": message.Content,
+					})
+				}
+
+				// Add file attachments
+				for _, file := range message.Files {
+					fileContent := map[string]interface{}{
+						"type": "image_url",
+						"image_url": map[string]interface{}{
+							"url": fmt.Sprintf("data:%s;base64,%s", file.MimeType, base64.StdEncoding.EncodeToString(file.Data)),
+						},
+					}
+					content = append(content, fileContent)
+				}
+
+				msg["content"] = content
+			} else {
+				// Simple text message
+				msg["content"] = message.Content
+			}
+
+			openRouterMessages = append(openRouterMessages, msg)
+		}
+
 		requestBody := map[string]interface{}{
 			"model":       model,
-			"messages":    messages,
+			"messages":    openRouterMessages,
 			"temperature": temperature,
 		}
 

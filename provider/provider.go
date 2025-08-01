@@ -7,10 +7,19 @@ import (
 	"github.com/FramnkRulez/go-llm-router/internal/httpclient"
 )
 
-// Message represents a chat message with role and content
+// File represents a file attachment with metadata and data
+type File struct {
+	Type     string `json:"type"`      // "image", "document", etc.
+	Data     []byte `json:"data"`      // file data (base64 encoded for JSON)
+	MimeType string `json:"mime_type"` // MIME type
+	Name     string `json:"name"`      // filename
+}
+
+// Message represents a chat message with role, content, and optional file attachments
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+	Files   []File `json:"files,omitempty"`
 }
 
 // Provider interface for LLM providers
