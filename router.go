@@ -3,6 +3,7 @@
 //
 // The router supports automatic fallback between providers and models,
 // making it easy to maximize usage of free tiers across multiple LLM services.
+// It also supports tool calls for MCP (Model Context Protocol) servers.
 package gollmrouter
 
 import (
@@ -58,17 +59,59 @@ func (r *Router) Query(ctx context.Context, messages []provider.Message, tempera
 		copy(providerMessages[i].Files, msg.Files)
 	}
 
+	options := provider.QueryOptions{
+		Temperature: temperature,
+		ForceModel:  forceModel,
+	}
+
 	for _, provider := range r.providers {
 		if !provider.HasRemainingRequests(ctx) {
 			continue
 		}
 
-		result, model, err := provider.Query(ctx, providerMessages, temperature, forceModel)
+		result, err := provider.QueryWithOptions(ctx, providerMessages, options)
 		if err == nil {
-			return result, model, nil
+			return result.Content, result.Model, nil
 		}
 	}
 	return "", "", fmt.Errorf("no provider available or all providers failed")
+}
+
+// QueryWithOptions sends a prompt to available LLM providers with advanced options including tool calls.
+// It automatically handles fallback between providers and models within each provider.
+//
+// Parameters:
+//   - ctx: Context for the request
+//   - messages: Array of chat messages to send (can include file attachments)
+//   - options: Query options including temperature, model, tools, and tool choice
+//
+// Returns:
+//   - result: The query result containing content, model, tool calls, and finish reason
+//   - error: Any error that occurred (nil if successful)
+func (r *Router) QueryWithOptions(ctx context.Context, messages []provider.Message, options provider.QueryOptions) (*provider.QueryResult, error) {
+	// Convert messages to provider format (including file attachments)
+	providerMessages := make([]provider.Message, len(messages))
+	for i, msg := range messages {
+		providerMessages[i] = provider.Message{
+			Role:    msg.Role,
+			Content: msg.Content,
+			Files:   make([]provider.File, len(msg.Files)),
+		}
+		// Copy file attachments
+		copy(providerMessages[i].Files, msg.Files)
+	}
+
+	for _, provider := range r.providers {
+		if !provider.HasRemainingRequests(ctx) {
+			continue
+		}
+
+		result, err := provider.QueryWithOptions(ctx, providerMessages, options)
+		if err == nil {
+			return result, nil
+		}
+	}
+	return nil, fmt.Errorf("no provider available or all providers failed")
 }
 
 // HasRemainingRequests checks if any provider has remaining requests.
