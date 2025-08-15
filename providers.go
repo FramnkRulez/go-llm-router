@@ -19,6 +19,30 @@ type FileAttachment = provider.File
 // Message represents a chat message with role, content, and optional file attachments
 type Message = provider.Message
 
+// ToolCall represents a tool call request from the LLM
+type ToolCall = provider.ToolCall
+
+// ToolCallFunction represents the function details in a tool call
+type ToolCallFunction = provider.ToolCallFunction
+
+// ToolCallResult represents the result of executing a tool call
+type ToolCallResult = provider.ToolCallResult
+
+// Tool represents a tool definition that can be called by the LLM
+type Tool = provider.Tool
+
+// ToolFunction represents a function definition for a tool
+type ToolFunction = provider.ToolFunction
+
+// QueryOptions holds options for LLM queries including tool calls
+type QueryOptions = provider.QueryOptions
+
+// QueryResult represents the result of an LLM query
+type QueryResult = provider.QueryResult
+
+// ToolExecutor interface for executing tool calls
+type ToolExecutor = providers.ToolExecutor
+
 // GeminiConfig holds configuration for creating a Gemini provider
 type GeminiConfig struct {
 	APIKey       string
@@ -35,6 +59,16 @@ type OpenRouterConfig struct {
 	Referer      string
 	XTitle       string
 	Timeout      time.Duration
+}
+
+// FunctionCallingConfig holds configuration for creating a function calling provider
+type FunctionCallingConfig struct {
+	APIKey       string
+	URL          string
+	Models       []string
+	MaxDailyReqs int
+	Timeout      time.Duration
+	ToolExecutor ToolExecutor
 }
 
 // NewGeminiProvider creates a new Gemini provider with the given configuration
@@ -60,6 +94,54 @@ func NewOpenRouterProvider(config OpenRouterConfig) (provider.Provider, error) {
 		httpClient,
 		config.MaxDailyReqs,
 	)
+}
+
+// NewFunctionCallingProvider creates a new function calling provider with the given configuration
+func NewFunctionCallingProvider(config FunctionCallingConfig) (provider.Provider, error) {
+	httpClient := httpclient.New("go-llm-router/1.0")
+
+	return providers.NewFunctionCallingProvider(
+		config.APIKey,
+		config.URL,
+		config.Timeout,
+		config.Models,
+		httpClient,
+		config.MaxDailyReqs,
+		config.ToolExecutor,
+	)
+}
+
+// NewTool creates a new tool definition
+func NewTool(name, description string, parameters map[string]interface{}) Tool {
+	return Tool{
+		Type: "function",
+		Function: ToolFunction{
+			Name:        name,
+			Description: description,
+			Parameters:  parameters,
+		},
+	}
+}
+
+// NewToolCall creates a new tool call
+func NewToolCall(id, functionName string, arguments map[string]interface{}) ToolCall {
+	return ToolCall{
+		ID:   id,
+		Type: "function",
+		Function: ToolCallFunction{
+			Name:      functionName,
+			Arguments: arguments,
+		},
+	}
+}
+
+// NewToolCallResult creates a new tool call result
+func NewToolCallResult(id string, content interface{}) *ToolCallResult {
+	return &ToolCallResult{
+		ID:      id,
+		Type:    "function",
+		Content: content,
+	}
 }
 
 // NewFileAttachment creates a new file attachment from file data

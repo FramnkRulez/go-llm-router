@@ -46,8 +46,23 @@ func newOpenRouterProvider(apiKey string, url string, timeout time.Duration, mod
 	}, nil
 }
 
-// Query sends a prompt to OpenRouter and returns the response
+// Query sends a prompt to OpenRouter and returns the response (legacy method)
 func (o *OpenRouterProvider) Query(ctx context.Context, messages []provider.Message, temperature float64, forceModel string) (string, string, error) {
+	options := provider.QueryOptions{
+		Temperature: temperature,
+		ForceModel:  forceModel,
+	}
+
+	result, err := o.QueryWithOptions(ctx, messages, options)
+	if err != nil {
+		return "", "", err
+	}
+
+	return result.Content, result.Model, nil
+}
+
+// QueryWithOptions sends a prompt to OpenRouter with advanced options including tool calls
+func (o *OpenRouterProvider) QueryWithOptions(ctx context.Context, messages []provider.Message, options provider.QueryOptions) (*provider.QueryResult, error) {
 	var outerErr error
 
 	if time.Since(o.lastReset) > 24*time.Hour {
@@ -56,8 +71,8 @@ func (o *OpenRouterProvider) Query(ctx context.Context, messages []provider.Mess
 	}
 
 	modelsToUse := o.models
-	if forceModel != "" {
-		modelsToUse = []string{forceModel}
+	if options.ForceModel != "" {
+		modelsToUse = []string{options.ForceModel}
 	}
 
 	for _, model := range modelsToUse {
@@ -104,7 +119,17 @@ func (o *OpenRouterProvider) Query(ctx context.Context, messages []provider.Mess
 		requestBody := map[string]interface{}{
 			"model":       model,
 			"messages":    openRouterMessages,
-			"temperature": temperature,
+			"temperature": options.Temperature,
+		}
+
+		// Add tools if provided
+		if len(options.Tools) > 0 {
+			requestBody["tools"] = options.Tools
+		}
+
+		// Add tool_choice if provided
+		if options.ToolChoice != "" {
+			requestBody["tool_choice"] = options.ToolChoice
 		}
 
 		jsonData, err := json.Marshal(requestBody)
@@ -143,8 +168,10 @@ func (o *OpenRouterProvider) Query(ctx context.Context, messages []provider.Mess
 		var result struct {
 			Choices []struct {
 				Message struct {
-					Content string `json:"content"`
+					Content   string              `json:"content"`
+					ToolCalls []provider.ToolCall `json:"tool_calls,omitempty"`
 				} `json:"message"`
+				FinishReason string `json:"finish_reason"`
 			} `json:"choices"`
 		}
 
@@ -158,10 +185,18 @@ func (o *OpenRouterProvider) Query(ctx context.Context, messages []provider.Mess
 			continue
 		}
 
-		return result.Choices[0].Message.Content, model, nil
+		choice := result.Choices[0]
+		queryResult := &provider.QueryResult{
+			Content:      choice.Message.Content,
+			Model:        model,
+			ToolCalls:    choice.Message.ToolCalls,
+			FinishReason: choice.FinishReason,
+		}
+
+		return queryResult, nil
 	}
 
-	return "", "", outerErr
+	return nil, outerErr
 }
 
 // Close closes the OpenRouter provider
