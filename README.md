@@ -356,12 +356,23 @@ type GeminiConfig struct {
 ```go
 type OpenRouterConfig struct {
 	APIKey       string
-	URL          string
 	Models       []string
 	MaxDailyReqs int
 	Referer      string
 	XTitle       string
 	Timeout      time.Duration
+}
+```
+
+**Example:**
+```go
+cfg := gollmrouter.OpenRouterConfig{
+    APIKey:       apiKey,
+    Models:       []string{"mistralai/mistral-7b-instruct:free"},
+    MaxDailyReqs: 1000,
+    Referer:      "https://myapp.com",
+    XTitle:       "My App",
+    Timeout:      30 * time.Second,
 }
 ```
 
@@ -376,6 +387,8 @@ type FunctionCallingConfig struct {
 	ToolExecutor ToolExecutor
 }
 ```
+
+
 
 ### Helper Functions
 

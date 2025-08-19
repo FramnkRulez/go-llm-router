@@ -41,7 +41,6 @@ func main() {
 	// Create OpenRouter provider as fallback (also supports function calling)
 	openRouterProvider, err := gollmrouter.NewOpenRouterProvider(gollmrouter.OpenRouterConfig{
 		APIKey:       "your-openrouter-api-key",
-		URL:          "https://openrouter.ai/api/v1/chat/completions",
 		Models:       []string{"openai/gpt-4", "openai/gpt-3.5-turbo"},
 		MaxDailyReqs: 100,
 		Referer:      "your-app",
