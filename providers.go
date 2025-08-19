@@ -13,6 +13,11 @@ import (
 	"github.com/FramnkRulez/go-llm-router/provider"
 )
 
+// Common API endpoints
+const (
+	OpenRouterAPIEndpoint = "https://openrouter.ai/api/v1/chat/completions"
+)
+
 // FileAttachment represents a file attachment with metadata and data
 type FileAttachment = provider.File
 
@@ -53,7 +58,6 @@ type GeminiConfig struct {
 // OpenRouterConfig holds configuration for creating an OpenRouter provider
 type OpenRouterConfig struct {
 	APIKey       string
-	URL          string
 	Models       []string
 	MaxDailyReqs int
 	Referer      string
@@ -86,7 +90,7 @@ func NewOpenRouterProvider(config OpenRouterConfig) (provider.Provider, error) {
 
 	return providers.NewOpenRouterProvider(
 		config.APIKey,
-		config.URL,
+		OpenRouterAPIEndpoint,
 		config.Timeout,
 		config.Models,
 		config.Referer,
