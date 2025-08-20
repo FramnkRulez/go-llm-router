@@ -208,3 +208,8 @@ func (o *OpenRouterProvider) Close() {
 func (o *OpenRouterProvider) HasRemainingRequests(ctx context.Context) bool {
 	return o.requestsToday < o.maxDailyRequests
 }
+
+// Name returns the name of the provider
+func (o *OpenRouterProvider) Name() string {
+	return "OpenRouter"
+}

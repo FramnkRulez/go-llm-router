@@ -200,3 +200,8 @@ func (g *GeminiProvider) Close() {
 func (g *GeminiProvider) HasRemainingRequests(ctx context.Context) bool {
 	return g.requestsToday < g.maxDailyRequests
 }
+
+// Name returns the name of the provider
+func (g *GeminiProvider) Name() string {
+	return "Gemini"
+}

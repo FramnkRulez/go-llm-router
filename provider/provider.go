@@ -81,6 +81,9 @@ type Provider interface {
 
 	HasRemainingRequests(ctx context.Context) bool
 	Close()
+
+	// Name returns the name of the provider for error reporting
+	Name() string
 }
 
 // Config holds common configuration for providers

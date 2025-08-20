@@ -9,9 +9,61 @@ package gollmrouter
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/FramnkRulez/go-llm-router/provider"
 )
+
+// RouterError represents an error that occurred when all providers failed
+type RouterError struct {
+	Errors []ProviderError
+}
+
+// ProviderError represents an error from a specific provider
+type ProviderError struct {
+	ProviderName string
+	Error        error
+}
+
+// Error returns a formatted error message with details from all failed providers
+func (r *RouterError) Error() string {
+	if len(r.Errors) == 0 {
+		return "no provider available or all providers failed"
+	}
+
+	var errorMsgs []string
+	for _, err := range r.Errors {
+		errorMsgs = append(errorMsgs, fmt.Sprintf("%s: %v", err.ProviderName, err.Error))
+	}
+
+	return fmt.Sprintf("all providers failed:\n%s", strings.Join(errorMsgs, "\n"))
+}
+
+// Unwrap returns the underlying errors
+func (r *RouterError) Unwrap() []error {
+	var errors []error
+	for _, err := range r.Errors {
+		errors = append(errors, err.Error)
+	}
+	return errors
+}
+
+// GetErrors returns the list of provider errors
+func (r *RouterError) GetErrors() []ProviderError {
+	return r.Errors
+}
+
+// IsRouterError checks if an error is a RouterError
+func IsRouterError(err error) bool {
+	_, ok := err.(*RouterError)
+	return ok
+}
+
+// GetRouterError extracts RouterError from an error if it is one
+func GetRouterError(err error) (*RouterError, bool) {
+	routerErr, ok := err.(*RouterError)
+	return routerErr, ok
+}
 
 // Router manages multiple LLM providers and routes requests to available ones.
 // It automatically handles fallback between providers based on quota availability
@@ -64,8 +116,19 @@ func (r *Router) Query(ctx context.Context, messages []provider.Message, tempera
 		ForceModel:  forceModel,
 	}
 
-	for _, provider := range r.providers {
+	var routerError RouterError
+
+	for i, provider := range r.providers {
+		providerName := provider.Name()
+		if providerName == "" {
+			providerName = fmt.Sprintf("Provider %d", i+1)
+		}
+
 		if !provider.HasRemainingRequests(ctx) {
+			routerError.Errors = append(routerError.Errors, ProviderError{
+				ProviderName: providerName,
+				Error:        fmt.Errorf("no remaining requests"),
+			})
 			continue
 		}
 
@@ -73,8 +136,19 @@ func (r *Router) Query(ctx context.Context, messages []provider.Message, tempera
 		if err == nil {
 			return result.Content, result.Model, nil
 		}
+
+		// Collect the error
+		routerError.Errors = append(routerError.Errors, ProviderError{
+			ProviderName: providerName,
+			Error:        err,
+		})
 	}
-	return "", "", fmt.Errorf("no provider available or all providers failed")
+
+	if len(routerError.Errors) == 0 {
+		return "", "", fmt.Errorf("no providers configured")
+	}
+
+	return "", "", &routerError
 }
 
 // QueryWithOptions sends a prompt to available LLM providers with advanced options including tool calls.
@@ -101,8 +175,19 @@ func (r *Router) QueryWithOptions(ctx context.Context, messages []provider.Messa
 		copy(providerMessages[i].Files, msg.Files)
 	}
 
-	for _, provider := range r.providers {
+	var routerError RouterError
+
+	for i, provider := range r.providers {
+		providerName := provider.Name()
+		if providerName == "" {
+			providerName = fmt.Sprintf("Provider %d", i+1)
+		}
+
 		if !provider.HasRemainingRequests(ctx) {
+			routerError.Errors = append(routerError.Errors, ProviderError{
+				ProviderName: providerName,
+				Error:        fmt.Errorf("no remaining requests"),
+			})
 			continue
 		}
 
@@ -110,8 +195,19 @@ func (r *Router) QueryWithOptions(ctx context.Context, messages []provider.Messa
 		if err == nil {
 			return result, nil
 		}
+
+		// Collect the error
+		routerError.Errors = append(routerError.Errors, ProviderError{
+			ProviderName: providerName,
+			Error:        err,
+		})
 	}
-	return nil, fmt.Errorf("no provider available or all providers failed")
+
+	if len(routerError.Errors) == 0 {
+		return nil, fmt.Errorf("no providers configured")
+	}
+
+	return nil, &routerError
 }
 
 // HasRemainingRequests checks if any provider has remaining requests.

@@ -245,3 +245,8 @@ func (f *FunctionCallingProvider) Close() {
 func (f *FunctionCallingProvider) HasRemainingRequests(ctx context.Context) bool {
 	return f.requestsToday < f.maxDailyRequests
 }
+
+// Name returns the name of the provider
+func (f *FunctionCallingProvider) Name() string {
+	return "FunctionCalling"
+}
