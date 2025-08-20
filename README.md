@@ -161,7 +161,7 @@ func main() {
 	}
 
 	result, err := router.QueryWithOptions(context.Background(), []gollmrouter.Message{
-		{Role: "user", Content: "What is the current time and calculate 15 * 23?"},
+		gollmrouter.NewGeminiUserMessage("What is the current time and calculate 15 * 23?"),
 	}, options)
 	if err != nil {
 		log.Fatal(err)
@@ -403,6 +403,41 @@ file, err := gollmrouter.NewFileAttachmentFromPath("path/to/image.jpg")
 // Create message with image
 message, err := gollmrouter.NewMessageWithImage("user", "What's in this image?", "path/to/image.jpg")
 ```
+
+#### Strongly Typed Gemini Messages
+```go
+// Create user messages (default for all questions)
+userMessage := gollmrouter.NewGeminiUserMessage("What is the weather today?")
+userMessageWithImage := gollmrouter.NewGeminiUserMessage("What's in this image?", imageFile)
+
+// Create model/assistant messages
+modelMessage := gollmrouter.NewGeminiModelMessage("The weather is sunny today.")
+
+// Create user message with image from file path
+userMessageWithImage, err := gollmrouter.NewGeminiUserMessageWithImage("What's in this image?", "path/to/image.jpg")
+
+// Validate messages before sending
+err := gollmrouter.ValidateGeminiMessage(userMessage)
+err := gollmrouter.ValidateGeminiMessages(conversation)
+
+// Create a conversation with proper role types
+conversation := []gollmrouter.Message{
+    gollmrouter.NewGeminiUserMessage("Hello, I need help with math."),
+    gollmrouter.NewGeminiModelMessage("I'd be happy to help you with math!"),
+    gollmrouter.NewGeminiUserMessage("What is 2 + 2?"),
+}
+```
+
+**Gemini Role Types:**
+- **`user`** - Default role for all questions and user input
+- **`assistant`** - Role for model responses (converted to "model" internally)
+- **`system`** - System instructions (converted to "user" internally)
+
+**Benefits:**
+- **Type Safety**: Compile-time validation of role types
+- **Clear Intent**: Explicit role creation functions
+- **Validation**: Built-in validation to catch invalid roles early
+- **Gemini Compatibility**: Ensures messages work correctly with Gemini API
 
 #### Tool Creation
 ```go

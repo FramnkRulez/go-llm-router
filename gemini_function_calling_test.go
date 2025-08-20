@@ -1,16 +1,17 @@
-package gollmrouter
+package gollmrouter_test
 
 import (
 	"context"
 	"testing"
 
+	gollmrouter "github.com/FramnkRulez/go-llm-router"
 	"github.com/FramnkRulez/go-llm-router/ai"
 	"github.com/FramnkRulez/go-llm-router/provider"
 )
 
 func TestGeminiProviderWithFunctionCalling(t *testing.T) {
 	// Test that Gemini provider can be created with function calling support
-	geminiProvider, err := NewGeminiProvider(GeminiConfig{
+	geminiProvider, err := gollmrouter.NewGeminiProvider(gollmrouter.GeminiConfig{
 		APIKey:       "test-api-key",
 		Models:       []string{"gemini-2.0-flash", "gemini-1.5-flash"},
 		MaxDailyReqs: 100,
@@ -31,7 +32,7 @@ func TestGeminiProviderWithFunctionCalling(t *testing.T) {
 
 func TestGeminiProviderConfiguration(t *testing.T) {
 	// Test Gemini configuration
-	config := GeminiConfig{
+	config := gollmrouter.GeminiConfig{
 		APIKey:       "test-gemini-key",
 		Models:       []string{"gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"},
 		MaxDailyReqs: 150,
@@ -98,7 +99,7 @@ func TestGeminiProviderWithTools(t *testing.T) {
 
 func TestGeminiProviderQueryOptions(t *testing.T) {
 	// Test query options with Gemini-specific settings
-	options := QueryOptions{
+	options := gollmrouter.QueryOptions{
 		Temperature: 0.8,
 		ForceModel:  "gemini-2.0-flash",
 		ToolChoice:  "auto",
@@ -127,7 +128,7 @@ func TestGeminiProviderQueryOptions(t *testing.T) {
 
 func TestGeminiProviderModelFallback(t *testing.T) {
 	// Test that Gemini provider supports model fallback
-	geminiProvider, err := NewGeminiProvider(GeminiConfig{
+	geminiProvider, err := gollmrouter.NewGeminiProvider(gollmrouter.GeminiConfig{
 		APIKey:       "test-api-key",
 		Models:       []string{"gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"},
 		MaxDailyReqs: 100,
@@ -139,7 +140,7 @@ func TestGeminiProviderModelFallback(t *testing.T) {
 
 	// Test that the provider has multiple models configured
 	// This would be tested in actual API calls, but we can verify the configuration
-	config := GeminiConfig{
+	config := gollmrouter.GeminiConfig{
 		Models: []string{"gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"},
 	}
 
@@ -181,8 +182,8 @@ func TestGeminiProviderFunctionCallingIntegration(t *testing.T) {
 
 func TestGeminiProviderWithCustomTools(t *testing.T) {
 	// Test creating custom tools for Gemini
-	customTools := []Tool{
-		NewTool(
+	customTools := []gollmrouter.Tool{
+		gollmrouter.NewTool(
 			"calculate_area",
 			"Calculate the area of a circle given its radius",
 			map[string]interface{}{
@@ -196,7 +197,7 @@ func TestGeminiProviderWithCustomTools(t *testing.T) {
 				"required": []string{"radius"},
 			},
 		),
-		NewTool(
+		gollmrouter.NewTool(
 			"get_weather",
 			"Get weather information for a location",
 			map[string]interface{}{
@@ -259,7 +260,7 @@ func TestGeminiProviderTemperatureHandling(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			options := QueryOptions{
+			options := gollmrouter.QueryOptions{
 				Temperature: tc.temperature,
 				ForceModel:  "gemini-2.0-flash",
 			}
@@ -285,7 +286,7 @@ func TestGeminiProviderToolChoiceOptions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			options := QueryOptions{
+			options := gollmrouter.QueryOptions{
 				Temperature: 0.7,
 				ForceModel:  "gemini-2.0-flash",
 				ToolChoice:  tc.toolChoice,

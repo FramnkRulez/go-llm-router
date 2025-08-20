@@ -58,10 +58,10 @@ func main() {
 	}
 	defer router.Close()
 
-	// Example 1: Basic query without function calls
+	// Example 1: Basic query without function calls (using strongly typed Gemini messages)
 	fmt.Println("=== Example 1: Basic Query ===")
 	response, model, err := router.Query(context.Background(), []gollmrouter.Message{
-		{Role: "user", Content: "Hello, who are you?"},
+		gollmrouter.NewGeminiUserMessage("Hello, who are you?"),
 	}, 0.7, "")
 	if err != nil {
 		log.Printf("Query failed: %v", err)
@@ -78,7 +78,7 @@ func main() {
 	}
 
 	result, err := router.QueryWithOptions(context.Background(), []gollmrouter.Message{
-		{Role: "user", Content: "What is the current time and calculate 15 * 23?"},
+		gollmrouter.NewGeminiUserMessage("What is the current time and calculate 15 * 23?"),
 	}, options)
 	if err != nil {
 		log.Printf("Query with options failed: %v", err)
@@ -93,7 +93,7 @@ func main() {
 	// Example 3: String operations with function calls
 	fmt.Println("=== Example 3: String Operations ===")
 	result2, err := router.QueryWithOptions(context.Background(), []gollmrouter.Message{
-		{Role: "user", Content: "Convert 'Hello World' to uppercase and tell me its length."},
+		gollmrouter.NewGeminiUserMessage("Convert 'Hello World' to uppercase and tell me its length."),
 	}, options)
 	if err != nil {
 		log.Printf("String operations query failed: %v", err)
@@ -108,7 +108,7 @@ func main() {
 	// Example 4: Mathematical calculations
 	fmt.Println("=== Example 4: Mathematical Calculations ===")
 	result3, err := router.QueryWithOptions(context.Background(), []gollmrouter.Message{
-		{Role: "user", Content: "What is the square root of 144 and what is 25 + 37?"},
+		gollmrouter.NewGeminiUserMessage("What is the square root of 144 and what is 25 + 37?"),
 	}, options)
 	if err != nil {
 		log.Printf("Math query failed: %v", err)
@@ -146,7 +146,7 @@ func main() {
 	}
 
 	result4, err := router.QueryWithOptions(context.Background(), []gollmrouter.Message{
-		{Role: "user", Content: "What's the weather like in New York?"},
+		gollmrouter.NewGeminiUserMessage("What's the weather like in New York?"),
 	}, customOptions)
 	if err != nil {
 		log.Printf("Custom tools query failed: %v", err)
@@ -168,7 +168,7 @@ func main() {
 	}
 
 	result5, err := router.QueryWithOptions(context.Background(), []gollmrouter.Message{
-		{Role: "user", Content: "Calculate the area of a circle with radius 5 and tell me the current time."},
+		gollmrouter.NewGeminiUserMessage("Calculate the area of a circle with radius 5 and tell me the current time."),
 	}, geminiOptions)
 	if err != nil {
 		log.Printf("Gemini function calling query failed: %v", err)
@@ -179,6 +179,50 @@ func main() {
 		}
 		fmt.Printf("Finish Reason: %s\n\n", result5.FinishReason)
 	}
+
+	// Example 7: Strongly typed Gemini message creation
+	fmt.Println("=== Example 7: Strongly Typed Gemini Messages ===")
+
+	// Create messages using the strongly typed helpers
+	userMessage := gollmrouter.NewGeminiUserMessage("What is 2 + 2?")
+	modelMessage := gollmrouter.NewGeminiModelMessage("2 + 2 equals 4.")
+
+	// Validate messages before sending
+	if err := gollmrouter.ValidateGeminiMessage(userMessage); err != nil {
+		log.Printf("User message validation failed: %v", err)
+	} else {
+		fmt.Println("✓ User message is valid for Gemini")
+	}
+
+	if err := gollmrouter.ValidateGeminiMessage(modelMessage); err != nil {
+		log.Printf("Model message validation failed: %v", err)
+	} else {
+		fmt.Println("✓ Model message is valid for Gemini")
+	}
+
+	// Create a conversation with proper role types
+	conversation := []gollmrouter.Message{
+		gollmrouter.NewGeminiUserMessage("Hello, I need help with math."),
+		gollmrouter.NewGeminiModelMessage("I'd be happy to help you with math! What do you need assistance with?"),
+		gollmrouter.NewGeminiUserMessage("What is the square root of 16?"),
+	}
+
+	// Validate the entire conversation
+	if err := gollmrouter.ValidateGeminiMessages(conversation); err != nil {
+		log.Printf("Conversation validation failed: %v", err)
+	} else {
+		fmt.Println("✓ Entire conversation is valid for Gemini")
+	}
+
+	// Test with an invalid role (this should fail validation)
+	invalidMessage := gollmrouter.Message{Role: "invalid", Content: "This should fail"}
+	if err := gollmrouter.ValidateGeminiMessage(invalidMessage); err != nil {
+		fmt.Printf("✓ Correctly rejected invalid role: %v\n", err)
+	} else {
+		fmt.Println("✗ Should have rejected invalid role")
+	}
+
+	fmt.Println()
 }
 
 // Example of a custom tool executor for weather
