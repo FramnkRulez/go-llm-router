@@ -161,7 +161,7 @@ func main() {
 	}
 
 	result, err := router.QueryWithOptions(context.Background(), []gollmrouter.Message{
-		{Role: "user", Content: "What is the current time and calculate 15 * 23?"},
+		gollmrouter.NewGeminiUserMessage("What is the current time and calculate 15 * 23?"),
 	}, options)
 	if err != nil {
 		log.Fatal(err)
@@ -404,6 +404,41 @@ file, err := gollmrouter.NewFileAttachmentFromPath("path/to/image.jpg")
 message, err := gollmrouter.NewMessageWithImage("user", "What's in this image?", "path/to/image.jpg")
 ```
 
+#### Strongly Typed Gemini Messages
+```go
+// Create user messages (default for all questions)
+userMessage := gollmrouter.NewGeminiUserMessage("What is the weather today?")
+userMessageWithImage := gollmrouter.NewGeminiUserMessage("What's in this image?", imageFile)
+
+// Create model/assistant messages
+modelMessage := gollmrouter.NewGeminiModelMessage("The weather is sunny today.")
+
+// Create user message with image from file path
+userMessageWithImage, err := gollmrouter.NewGeminiUserMessageWithImage("What's in this image?", "path/to/image.jpg")
+
+// Validate messages before sending
+err := gollmrouter.ValidateGeminiMessage(userMessage)
+err := gollmrouter.ValidateGeminiMessages(conversation)
+
+// Create a conversation with proper role types
+conversation := []gollmrouter.Message{
+    gollmrouter.NewGeminiUserMessage("Hello, I need help with math."),
+    gollmrouter.NewGeminiModelMessage("I'd be happy to help you with math!"),
+    gollmrouter.NewGeminiUserMessage("What is 2 + 2?"),
+}
+```
+
+**Gemini Role Types:**
+- **`user`** - Default role for all questions and user input
+- **`assistant`** - Role for model responses (converted to "model" internally)
+- **`system`** - System instructions (converted to "user" internally)
+
+**Benefits:**
+- **Type Safety**: Compile-time validation of role types
+- **Clear Intent**: Explicit role creation functions
+- **Validation**: Built-in validation to catch invalid roles early
+- **Gemini Compatibility**: Ensures messages work correctly with Gemini API
+
 #### Tool Creation
 ```go
 // Create a tool
@@ -429,6 +464,53 @@ toolCall := gollmrouter.NewToolCall("call_123", "get_weather", map[string]interf
 
 // Create a tool call result
 result := gollmrouter.NewToolCallResult("call_123", "22°C, Sunny")
+```
+
+## Error Handling
+
+The library provides detailed error information when all providers fail, making it easier to debug issues.
+
+### RouterError
+
+When all providers fail, the router returns a `RouterError` that contains details about each provider's failure:
+
+```go
+resp, model, err := router.Query(ctx, messages, 0.7, "")
+if err != nil {
+    if routerErr, ok := err.(*gollmrouter.RouterError); ok {
+        fmt.Println("All providers failed:")
+        for _, providerErr := range routerErr.Errors {
+            fmt.Printf("  %s: %v\n", providerErr.ProviderName, providerErr.Error)
+        }
+    } else {
+        fmt.Printf("Unexpected error: %v\n", err)
+    }
+}
+```
+
+### Helper Functions
+
+```go
+// Check if an error is a RouterError
+if gollmrouter.IsRouterError(err) {
+    // Handle detailed error
+}
+
+// Extract RouterError from an error
+if routerErr, ok := gollmrouter.GetRouterError(err); ok {
+    // Access detailed error information
+    for _, providerErr := range routerErr.GetErrors() {
+        fmt.Printf("%s failed: %v\n", providerErr.ProviderName, providerErr.Error)
+    }
+}
+```
+
+### Example Error Output
+
+```
+all providers failed:
+Gemini: failed to generate content: invalid API key
+OpenRouter: failed to create request: context deadline exceeded
 ```
 
 ## How Fallback Works

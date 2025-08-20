@@ -1,12 +1,14 @@
-package gollmrouter
+package gollmrouter_test
 
 import (
 	"testing"
+
+	gollmrouter "github.com/FramnkRulez/go-llm-router"
 )
 
 func TestNewFileAttachment(t *testing.T) {
 	data := []byte("test image data")
-	file := NewFileAttachment("image", "image/jpeg", "test.jpg", data)
+	file := gollmrouter.NewFileAttachment("image", "image/jpeg", "test.jpg", data)
 
 	if file.Type != "image" {
 		t.Errorf("Expected file type 'image', got '%s'", file.Type)
@@ -23,8 +25,8 @@ func TestNewFileAttachment(t *testing.T) {
 }
 
 func TestNewMessage(t *testing.T) {
-	file := NewFileAttachment("image", "image/jpeg", "test.jpg", []byte("data"))
-	message := NewMessage("user", "test content", file)
+	file := gollmrouter.NewFileAttachment("image", "image/jpeg", "test.jpg", []byte("data"))
+	message := gollmrouter.NewMessage("user", "test content", file)
 
 	if message.Role != "user" {
 		t.Errorf("Expected role 'user', got '%s'", message.Role)
@@ -41,9 +43,9 @@ func TestNewMessage(t *testing.T) {
 }
 
 func TestNewMessageWithMultipleFiles(t *testing.T) {
-	file1 := NewFileAttachment("image", "image/jpeg", "test1.jpg", []byte("data1"))
-	file2 := NewFileAttachment("image", "image/png", "test2.png", []byte("data2"))
-	message := NewMessage("user", "test content", file1, file2)
+	file1 := gollmrouter.NewFileAttachment("image", "image/jpeg", "test1.jpg", []byte("data1"))
+	file2 := gollmrouter.NewFileAttachment("image", "image/png", "test2.png", []byte("data2"))
+	message := gollmrouter.NewMessage("user", "test content", file1, file2)
 
 	if len(message.Files) != 2 {
 		t.Errorf("Expected 2 files, got %d", len(message.Files))
@@ -57,7 +59,7 @@ func TestNewMessageWithMultipleFiles(t *testing.T) {
 }
 
 func TestNewMessageWithoutFiles(t *testing.T) {
-	message := NewMessage("user", "test content")
+	message := gollmrouter.NewMessage("user", "test content")
 
 	if message.Role != "user" {
 		t.Errorf("Expected role 'user', got '%s'", message.Role)

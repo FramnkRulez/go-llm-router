@@ -9,6 +9,26 @@ import (
 	"google.golang.org/genai"
 )
 
+// GeminiRole represents the allowed roles for Gemini API
+type GeminiRole string
+
+const (
+	// GeminiRoleUser represents a user message (default for all questions)
+	GeminiRoleUser GeminiRole = "user"
+	// GeminiRoleModel represents a model/assistant response
+	GeminiRoleModel GeminiRole = "model"
+)
+
+// String returns the string representation of the role
+func (r GeminiRole) String() string {
+	return string(r)
+}
+
+// IsValid checks if the role is valid for Gemini
+func (r GeminiRole) IsValid() bool {
+	return r == GeminiRoleUser || r == GeminiRoleModel
+}
+
 // GeminiProvider implements the Provider interface for Google's Gemini API
 type GeminiProvider struct {
 	apiKey           string
@@ -20,6 +40,32 @@ type GeminiProvider struct {
 }
 
 var _ provider.Provider = (*GeminiProvider)(nil)
+
+// convertRoleToGemini converts standard chat roles to Gemini-compatible roles
+// Returns a strongly typed GeminiRole
+func convertRoleToGemini(role string) GeminiRole {
+	switch role {
+	case "system":
+		// Gemini doesn't support "system" role, convert to "user"
+		return GeminiRoleUser
+	case "user":
+		return GeminiRoleUser
+	case "assistant":
+		return GeminiRoleModel
+	default:
+		// Default to user for unknown roles
+		return GeminiRoleUser
+	}
+}
+
+// validateGeminiRole validates that a role is acceptable for Gemini
+func validateGeminiRole(role string) error {
+	geminiRole := convertRoleToGemini(role)
+	if !geminiRole.IsValid() {
+		return fmt.Errorf("invalid role for Gemini: %s (only 'user' and 'assistant' are supported)", role)
+	}
+	return nil
+}
 
 // newGeminiProvider creates a new Gemini provider
 func newGeminiProvider(apiKey string, models []string, maxDailyRequests int) (provider.Provider, error) {
@@ -74,6 +120,10 @@ func (g *GeminiProvider) QueryWithOptions(ctx context.Context, messages []provid
 		// Convert messages to Gemini format with support for files
 		genaiMessages := make([]*genai.Content, 0, len(messages))
 		for _, message := range messages {
+			// Validate role for Gemini
+			if err := validateGeminiRole(message.Role); err != nil {
+				return nil, fmt.Errorf("message validation failed: %w", err)
+			}
 			parts := make([]*genai.Part, 0)
 
 			// Add text content if present
@@ -105,9 +155,12 @@ func (g *GeminiProvider) QueryWithOptions(ctx context.Context, messages []provid
 				}
 			}
 
+			// Convert role to Gemini format
+			geminiRole := convertRoleToGemini(message.Role)
+
 			genaiMessages = append(genaiMessages, &genai.Content{
 				Parts: parts,
-				Role:  message.Role,
+				Role:  geminiRole.String(),
 			})
 		}
 
@@ -199,4 +252,9 @@ func (g *GeminiProvider) Close() {
 // HasRemainingRequests checks if the provider has remaining requests
 func (g *GeminiProvider) HasRemainingRequests(ctx context.Context) bool {
 	return g.requestsToday < g.maxDailyRequests
+}
+
+// Name returns the name of the provider
+func (g *GeminiProvider) Name() string {
+	return "Gemini"
 }

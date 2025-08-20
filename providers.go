@@ -1,6 +1,7 @@
 package gollmrouter
 
 import (
+	"fmt"
 	"io"
 	"mime"
 	"os"
@@ -209,4 +210,58 @@ func NewMessageWithImage(role, content, imagePath string) (Message, error) {
 		return Message{}, err
 	}
 	return NewMessage(role, content, imageFile), nil
+}
+
+// Gemini-specific message creation helpers
+
+// NewGeminiUserMessage creates a user message for Gemini (default for all questions)
+func NewGeminiUserMessage(content string, files ...FileAttachment) Message {
+	return Message{
+		Role:    "user",
+		Content: content,
+		Files:   files,
+	}
+}
+
+// NewGeminiModelMessage creates a model/assistant message for Gemini
+func NewGeminiModelMessage(content string) Message {
+	return Message{
+		Role:    "assistant",
+		Content: content,
+		Files:   []FileAttachment{},
+	}
+}
+
+// NewGeminiUserMessageWithImage creates a Gemini user message with an image attachment
+func NewGeminiUserMessageWithImage(content, imagePath string) (Message, error) {
+	imageFile, err := NewFileAttachmentFromPath(imagePath)
+	if err != nil {
+		return Message{}, err
+	}
+	return NewGeminiUserMessage(content, imageFile), nil
+}
+
+// ValidateGeminiMessage validates that a message has a valid role for Gemini
+func ValidateGeminiMessage(message Message) error {
+	validRoles := map[string]bool{
+		"user":      true,
+		"assistant": true,
+		"system":    true, // Will be converted to "user" by Gemini
+	}
+
+	if !validRoles[message.Role] {
+		return fmt.Errorf("invalid role for Gemini: %s (only 'user', 'assistant', and 'system' are supported)", message.Role)
+	}
+
+	return nil
+}
+
+// ValidateGeminiMessages validates a slice of messages for Gemini compatibility
+func ValidateGeminiMessages(messages []Message) error {
+	for i, message := range messages {
+		if err := ValidateGeminiMessage(message); err != nil {
+			return fmt.Errorf("message %d: %w", i, err)
+		}
+	}
+	return nil
 }

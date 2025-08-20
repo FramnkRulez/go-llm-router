@@ -1,14 +1,15 @@
-package gollmrouter
+package gollmrouter_test
 
 import (
 	"testing"
 
 	"github.com/FramnkRulez/go-llm-router/ai"
+	gollmrouter "github.com/FramnkRulez/go-llm-router"
 )
 
 func TestFunctionCallingProvider(t *testing.T) {
 	// Test tool creation
-	tool := NewTool(
+	tool := gollmrouter.NewTool(
 		"test_function",
 		"A test function",
 		map[string]interface{}{
@@ -28,7 +29,7 @@ func TestFunctionCallingProvider(t *testing.T) {
 	}
 
 	// Test tool call creation
-	toolCall := NewToolCall("call_123", "test_function", map[string]interface{}{
+	toolCall := gollmrouter.NewToolCall("call_123", "test_function", map[string]interface{}{
 		"param": "test_value",
 	})
 
@@ -41,7 +42,7 @@ func TestFunctionCallingProvider(t *testing.T) {
 	}
 
 	// Test tool call result creation
-	result := NewToolCallResult("call_123", "test_result")
+	result := gollmrouter.NewToolCallResult("call_123", "test_result")
 	if result.ID != "call_123" {
 		t.Errorf("Expected result ID 'call_123', got '%s'", result.ID)
 	}
@@ -59,7 +60,7 @@ func TestFunctionCallingProvider(t *testing.T) {
 	}
 
 	// Test query options
-	options := QueryOptions{
+	options := gollmrouter.QueryOptions{
 		Temperature: 0.7,
 		Tools:       tools,
 		ToolChoice:  "auto",
@@ -80,7 +81,7 @@ func TestFunctionCallingProvider(t *testing.T) {
 
 func TestFunctionCallingConfig(t *testing.T) {
 	// Test that FunctionCallingConfig can be created
-	config := FunctionCallingConfig{
+	config := gollmrouter.FunctionCallingConfig{
 		APIKey:       "test-key",
 		URL:          "https://api.openai.com/v1/chat/completions",
 		Models:       []string{"gpt-4"},
@@ -113,7 +114,7 @@ func TestToolExecutorInterface(t *testing.T) {
 	executor := ai.NewSimpleToolExecutor()
 
 	// Test that the executor implements the interface
-	var _ ToolExecutor = executor
+	var _ gollmrouter.ToolExecutor = executor
 
 	// Test getting available tools
 	tools := executor.GetAvailableTools()
@@ -139,7 +140,7 @@ func TestToolExecutorInterface(t *testing.T) {
 
 func TestQueryOptions(t *testing.T) {
 	// Test creating query options
-	options := QueryOptions{
+	options := gollmrouter.QueryOptions{
 		Temperature: 0.8,
 		ForceModel:  "gpt-4",
 		ToolChoice:  "none",
@@ -158,8 +159,8 @@ func TestQueryOptions(t *testing.T) {
 	}
 
 	// Test with tools
-	tools := []Tool{
-		NewTool("test", "test tool", map[string]interface{}{}),
+	tools := []gollmrouter.Tool{
+		gollmrouter.NewTool("test", "test tool", map[string]interface{}{}),
 	}
 	options.Tools = tools
 
