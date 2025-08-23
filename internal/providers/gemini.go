@@ -3,6 +3,8 @@ package providers
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"github.com/FramnkRulez/go-llm-router/provider"
@@ -38,6 +40,9 @@ type GeminiProvider struct {
 	requestsToday    int
 	lastReset        time.Time
 }
+
+// geminiDebugEnabled enables verbose logging when GEMINI_DEBUG=1 is set in env.
+var geminiDebugEnabled = os.Getenv("GEMINI_DEBUG") == "1"
 
 var _ provider.Provider = (*GeminiProvider)(nil)
 
@@ -204,20 +209,30 @@ func (g *GeminiProvider) QueryWithOptions(ctx context.Context, messages []provid
 		finishReason := "stop"
 		var toolCalls []provider.ToolCall
 
-		for _, candidate := range resp.Candidates {
+		for ci, candidate := range resp.Candidates {
 			if candidate.FinishReason != "" {
 				finishReason = string(candidate.FinishReason)
 			}
 
-			for _, part := range candidate.Content.Parts {
+			candidateHandled := false
+			// Defensive: candidate.Content may be nil
+			if candidate.Content == nil || len(candidate.Content.Parts) == 0 {
+				if geminiDebugEnabled {
+					log.Printf("[gemini] candidate %d has no parts (finish_reason=%s model=%s)", ci, finishReason, model)
+				}
+				continue
+			}
+
+			for pi, part := range candidate.Content.Parts {
+				partHandled := false
 				if part.Text != "" {
 					content += part.Text
+					partHandled = true
 				}
 
-				// Handle function calls if present
-				if part.FunctionCall != nil {
+				if part.FunctionCall != nil { // tool/function call
 					toolCall := provider.ToolCall{
-						ID:   part.FunctionCall.Name, // Use function name as ID
+						ID:   part.FunctionCall.Name,
 						Type: "function",
 						Function: provider.ToolCallFunction{
 							Name:      part.FunctionCall.Name,
@@ -225,7 +240,29 @@ func (g *GeminiProvider) QueryWithOptions(ctx context.Context, messages []provid
 						},
 					}
 					toolCalls = append(toolCalls, toolCall)
+					partHandled = true
+					if geminiDebugEnabled {
+						log.Printf("[gemini] tool call model=%s candidate=%d part=%d name=%s args=%v", model, ci, pi, part.FunctionCall.Name, part.FunctionCall.Args)
+					}
 				}
+
+				if part.InlineData != nil { // currently not surfaced in Content aggregation
+					if geminiDebugEnabled {
+						log.Printf("[gemini] inline data ignored model=%s candidate=%d part=%d mime=%s bytes=%d", model, ci, pi, part.InlineData.MIMEType, len(part.InlineData.Data))
+					}
+					partHandled = true
+				}
+
+				if !partHandled && geminiDebugEnabled {
+					log.Printf("[gemini] unhandled part model=%s candidate=%d part=%d %+v", model, ci, pi, part)
+				}
+				if partHandled {
+					candidateHandled = true
+				}
+			}
+
+			if !candidateHandled && geminiDebugEnabled {
+				log.Printf("[gemini] candidate %d produced no handled parts (finish_reason=%s model=%s)", ci, finishReason, model)
 			}
 		}
 
