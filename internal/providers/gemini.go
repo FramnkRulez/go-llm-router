@@ -33,12 +33,18 @@ func (r GeminiRole) IsValid() bool {
 
 // GeminiProvider implements the Provider interface for Google's Gemini API
 type GeminiProvider struct {
-	apiKey           string
-	client           *genai.Client
-	models           []string
-	maxDailyRequests int
-	requestsToday    int
-	lastReset        time.Time
+	apiKey               string
+	client               *genai.Client
+	models               []string
+	maxDailyRequests     int
+	maxRequestsPerMinute int
+	maxTokensPerMinute   int
+	rank                 int
+	requestsToday        int
+	requestsThisMinute   int
+	tokensThisMinute     int
+	lastReset            time.Time
+	lastMinuteReset      time.Time
 }
 
 // geminiDebugEnabled enables verbose logging when GEMINI_DEBUG=1 is set in env.
@@ -73,7 +79,7 @@ func validateGeminiRole(role string) error {
 }
 
 // newGeminiProvider creates a new Gemini provider
-func newGeminiProvider(apiKey string, models []string, maxDailyRequests int) (provider.Provider, error) {
+func newGeminiProvider(apiKey string, models []string, maxDailyRequests, maxRequestsPerMinute, maxTokensPerMinute, rank int) (provider.Provider, error) {
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  apiKey,
@@ -83,14 +89,35 @@ func newGeminiProvider(apiKey string, models []string, maxDailyRequests int) (pr
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
+	now := time.Now()
 	return &GeminiProvider{
-		apiKey:           apiKey,
-		client:           client,
-		models:           models,
-		maxDailyRequests: maxDailyRequests,
-		requestsToday:    0,
-		lastReset:        time.Now().Truncate(24 * time.Hour),
+		apiKey:               apiKey,
+		client:               client,
+		models:               models,
+		maxDailyRequests:     maxDailyRequests,
+		maxRequestsPerMinute: maxRequestsPerMinute,
+		maxTokensPerMinute:   maxTokensPerMinute,
+		rank:                 rank,
+		requestsToday:        0,
+		requestsThisMinute:   0,
+		tokensThisMinute:     0,
+		lastReset:            now.Truncate(24 * time.Hour),
+		lastMinuteReset:      now.Truncate(time.Minute),
 	}, nil
+}
+
+// estimateTokensForMessages provides a rough estimation of tokens in the messages
+// This is a simple approximation: ~4 characters per token for English text
+func estimateTokensForMessages(messages []provider.Message) int {
+	totalChars := 0
+	for _, msg := range messages {
+		totalChars += len(msg.Content)
+		for _, file := range msg.Files {
+			totalChars += len(file.Data)
+		}
+	}
+	// Rough approximation: 4 characters per token
+	return totalChars / 4
 }
 
 // Query sends a prompt to Gemini and returns the response (legacy method)
@@ -203,7 +230,13 @@ func (g *GeminiProvider) QueryWithOptions(ctx context.Context, messages []provid
 			continue
 		}
 
+		// Update rate limiting counters
 		g.requestsToday++
+		g.requestsThisMinute++
+
+		// Estimate tokens for this request (rough approximation)
+		estimatedTokens := estimateTokensForMessages(messages)
+		g.tokensThisMinute += estimatedTokens
 
 		content := ""
 		finishReason := "stop"
@@ -288,7 +321,39 @@ func (g *GeminiProvider) Close() {
 
 // HasRemainingRequests checks if the provider has remaining requests
 func (g *GeminiProvider) HasRemainingRequests(ctx context.Context) bool {
-	return g.requestsToday < g.maxDailyRequests
+	// Reset daily counter if needed
+	if time.Since(g.lastReset) > 24*time.Hour {
+		g.requestsToday = 0
+		g.lastReset = time.Now().Truncate(24 * time.Hour)
+	}
+	return g.maxDailyRequests == 0 || g.requestsToday < g.maxDailyRequests
+}
+
+// HasRemainingRequestsPerMinute checks if the provider has remaining requests per minute
+func (g *GeminiProvider) HasRemainingRequestsPerMinute(ctx context.Context) bool {
+	// Reset minute counter if needed
+	if time.Since(g.lastMinuteReset) > time.Minute {
+		g.requestsThisMinute = 0
+		g.tokensThisMinute = 0
+		g.lastMinuteReset = time.Now().Truncate(time.Minute)
+	}
+	return g.maxRequestsPerMinute == 0 || g.requestsThisMinute < g.maxRequestsPerMinute
+}
+
+// HasRemainingTokensPerMinute checks if the provider has remaining tokens per minute
+func (g *GeminiProvider) HasRemainingTokensPerMinute(ctx context.Context, estimatedTokens int) bool {
+	// Reset minute counter if needed
+	if time.Since(g.lastMinuteReset) > time.Minute {
+		g.requestsThisMinute = 0
+		g.tokensThisMinute = 0
+		g.lastMinuteReset = time.Now().Truncate(time.Minute)
+	}
+	return g.maxTokensPerMinute == 0 || (g.tokensThisMinute+estimatedTokens) <= g.maxTokensPerMinute
+}
+
+// GetRank returns the provider's rank
+func (g *GeminiProvider) GetRank() int {
+	return g.rank
 }
 
 // Name returns the name of the provider

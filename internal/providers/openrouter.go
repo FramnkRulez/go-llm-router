@@ -16,33 +16,46 @@ import (
 
 // OpenRouterProvider implements the Provider interface for OpenRouter API
 type OpenRouterProvider struct {
-	apiKey           string
-	url              string
-	timeout          time.Duration
-	client           httpclient.Client
-	models           []string
-	referer          string
-	xTitle           string
-	maxDailyRequests int
-	requestsToday    int
-	lastReset        time.Time
+	apiKey               string
+	url                  string
+	timeout              time.Duration
+	client               httpclient.Client
+	models               []string
+	referer              string
+	xTitle               string
+	maxDailyRequests     int
+	maxRequestsPerMinute int
+	maxTokensPerMinute   int
+	rank                 int
+	requestsToday        int
+	requestsThisMinute   int
+	tokensThisMinute     int
+	lastReset            time.Time
+	lastMinuteReset      time.Time
 }
 
 var _ provider.Provider = (*OpenRouterProvider)(nil)
 
 // newOpenRouterProvider creates a new OpenRouter provider
-func newOpenRouterProvider(apiKey string, url string, timeout time.Duration, models []string, referer string, xTitle string, httpClient httpclient.Client, maxDailyRequests int) (provider.Provider, error) {
+func newOpenRouterProvider(apiKey string, url string, timeout time.Duration, models []string, referer string, xTitle string, httpClient httpclient.Client, maxDailyRequests, maxRequestsPerMinute, maxTokensPerMinute, rank int) (provider.Provider, error) {
+	now := time.Now()
 	return &OpenRouterProvider{
-		url:              url,
-		apiKey:           apiKey,
-		timeout:          timeout,
-		models:           models,
-		client:           httpClient,
-		referer:          referer,
-		xTitle:           xTitle,
-		maxDailyRequests: maxDailyRequests,
-		requestsToday:    0,
-		lastReset:        time.Now().Truncate(24 * time.Hour),
+		url:                  url,
+		apiKey:               apiKey,
+		timeout:              timeout,
+		models:               models,
+		client:               httpClient,
+		referer:              referer,
+		xTitle:               xTitle,
+		maxDailyRequests:     maxDailyRequests,
+		maxRequestsPerMinute: maxRequestsPerMinute,
+		maxTokensPerMinute:   maxTokensPerMinute,
+		rank:                 rank,
+		requestsToday:        0,
+		requestsThisMinute:   0,
+		tokensThisMinute:     0,
+		lastReset:            now.Truncate(24 * time.Hour),
+		lastMinuteReset:      now.Truncate(time.Minute),
 	}, nil
 }
 
@@ -163,7 +176,13 @@ func (o *OpenRouterProvider) QueryWithOptions(ctx context.Context, messages []pr
 			continue
 		}
 
+		// Update rate limiting counters
 		o.requestsToday++
+		o.requestsThisMinute++
+
+		// Estimate tokens for this request (rough approximation)
+		estimatedTokens := estimateTokensForMessages(messages)
+		o.tokensThisMinute += estimatedTokens
 
 		var result struct {
 			Choices []struct {
@@ -206,7 +225,39 @@ func (o *OpenRouterProvider) Close() {
 
 // HasRemainingRequests checks if the provider has remaining requests
 func (o *OpenRouterProvider) HasRemainingRequests(ctx context.Context) bool {
-	return o.requestsToday < o.maxDailyRequests
+	// Reset daily counter if needed
+	if time.Since(o.lastReset) > 24*time.Hour {
+		o.requestsToday = 0
+		o.lastReset = time.Now().Truncate(24 * time.Hour)
+	}
+	return o.maxDailyRequests == 0 || o.requestsToday < o.maxDailyRequests
+}
+
+// HasRemainingRequestsPerMinute checks if the provider has remaining requests per minute
+func (o *OpenRouterProvider) HasRemainingRequestsPerMinute(ctx context.Context) bool {
+	// Reset minute counter if needed
+	if time.Since(o.lastMinuteReset) > time.Minute {
+		o.requestsThisMinute = 0
+		o.tokensThisMinute = 0
+		o.lastMinuteReset = time.Now().Truncate(time.Minute)
+	}
+	return o.maxRequestsPerMinute == 0 || o.requestsThisMinute < o.maxRequestsPerMinute
+}
+
+// HasRemainingTokensPerMinute checks if the provider has remaining tokens per minute
+func (o *OpenRouterProvider) HasRemainingTokensPerMinute(ctx context.Context, estimatedTokens int) bool {
+	// Reset minute counter if needed
+	if time.Since(o.lastMinuteReset) > time.Minute {
+		o.requestsThisMinute = 0
+		o.tokensThisMinute = 0
+		o.lastMinuteReset = time.Now().Truncate(time.Minute)
+	}
+	return o.maxTokensPerMinute == 0 || (o.tokensThisMinute+estimatedTokens) <= o.maxTokensPerMinute
+}
+
+// GetRank returns the provider's rank
+func (o *OpenRouterProvider) GetRank() int {
+	return o.rank
 }
 
 // Name returns the name of the provider
