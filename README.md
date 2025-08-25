@@ -10,6 +10,9 @@ A Go library that routes LLM requests across multiple providers to maximize free
 This library helps you manage multiple LLM API providers (like Gemini, OpenRouter, etc.) by automatically routing requests to available providers based on their remaining quota. When one provider hits its daily limit, it will fall back to the next available provider. It's up to you to provide valid models to each provider.
 
 **New Features**:
+- **Enhanced Rate Limiting**: Support for requests per minute and tokens per minute limits in addition to daily limits
+- **Provider Ranking**: Prioritize providers by rank - higher ranked providers are tried first
+- **Empty Response Handling**: Empty responses are treated as errors and trigger fallback to next provider
 - **File attachment support** for images and documents, allowing you to send files along with your text messages to supported models
 - **Function calling support** for LLM APIs that support function calling (OpenAI, Anthropic, etc.), enabling the LLM to execute custom functions
 - **Enhanced Gemini support** using the latest official Google Gen AI Go SDK with full function calling capabilities
@@ -65,6 +68,54 @@ func main() {
 
 	fmt.Printf("Model: %s\nResponse: %s\n", model, response)
 }
+```
+
+### Enhanced Rate Limiting and Provider Ranking
+
+The router now supports advanced rate limiting and provider prioritization:
+
+```go
+// Create providers with enhanced rate limiting and ranking
+geminiProvider1, _ := gollmrouter.NewGeminiProvider(gollmrouter.GeminiConfig{
+	APIKey:               "your-gemini-api-key-1",
+	Models:               []string{"gemini-2.0-flash", "gemini-1.5-flash"},
+	MaxDailyReqs:         50,  // 50 requests per day
+	MaxRequestsPerMinute: 10,  // 10 requests per minute
+	MaxTokensPerMinute:   1000, // 1000 tokens per minute
+	Rank:                 3,   // Highest priority
+})
+
+geminiProvider2, _ := gollmrouter.NewGeminiProvider(gollmrouter.GeminiConfig{
+	APIKey:               "your-gemini-api-key-2",
+	Models:               []string{"gemini-1.5-flash"},
+	MaxDailyReqs:         100, // 100 requests per day
+	MaxRequestsPerMinute: 5,   // 5 requests per minute
+	MaxTokensPerMinute:   500, // 500 tokens per minute
+	Rank:                 2,   // Medium priority
+})
+
+openRouterProvider, _ := gollmrouter.NewOpenRouterProvider(gollmrouter.OpenRouterConfig{
+	APIKey:               "your-openrouter-api-key",
+	Models:               []string{"openai/gpt-4", "openai/gpt-3.5-turbo"},
+	MaxDailyReqs:         200, // 200 requests per day
+	MaxRequestsPerMinute: 20,  // 20 requests per minute
+	MaxTokensPerMinute:   2000, // 2000 tokens per minute
+	Rank:                 1,   // Lowest priority (fallback)
+	Referer:              "your-app",
+	XTitle:               "your-title",
+	Timeout:              30 * time.Second,
+})
+
+// Create router - providers are automatically sorted by rank (highest first)
+router, _ := gollmrouter.NewRouter(geminiProvider1, geminiProvider2, openRouterProvider)
+```
+
+**Key Features**:
+- **Provider Ranking**: Higher ranked providers (higher rank number) are tried first
+- **Multiple Rate Limits**: Daily, per-minute, and token-based limits are all enforced
+- **Automatic Fallback**: When a provider hits any rate limit, the router automatically tries the next available provider
+- **Empty Response Handling**: Empty responses are treated as errors and trigger fallback
+- **Zero Limits**: Use `0` for any limit to disable it (unlimited)
 ```
 
 ### File Attachment Usage

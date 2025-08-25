@@ -73,16 +73,43 @@ type Router struct {
 }
 
 // NewRouter creates a new router with the specified providers.
-// Providers will be tried in the order they are passed to this function.
+// Providers will be tried in order of their rank (highest first), then in the order they are passed.
 // At least one provider must be specified.
 func NewRouter(providers ...provider.Provider) (*Router, error) {
 	if len(providers) == 0 {
 		return nil, fmt.Errorf("no providers configured")
 	}
 
+	// Sort providers by rank (highest rank first)
+	sortedProviders := make([]provider.Provider, len(providers))
+	copy(sortedProviders, providers)
+
+	// Simple bubble sort by rank (providers with higher rank come first)
+	for i := 0; i < len(sortedProviders)-1; i++ {
+		for j := 0; j < len(sortedProviders)-i-1; j++ {
+			if sortedProviders[j].GetRank() < sortedProviders[j+1].GetRank() {
+				sortedProviders[j], sortedProviders[j+1] = sortedProviders[j+1], sortedProviders[j]
+			}
+		}
+	}
+
 	return &Router{
-		providers: providers,
+		providers: sortedProviders,
 	}, nil
+}
+
+// estimateTokens provides a rough estimation of tokens in the messages
+// This is a simple approximation: ~4 characters per token for English text
+func estimateTokens(messages []provider.Message) int {
+	totalChars := 0
+	for _, msg := range messages {
+		totalChars += len(msg.Content)
+		for _, file := range msg.Files {
+			totalChars += len(file.Data)
+		}
+	}
+	// Rough approximation: 4 characters per token
+	return totalChars / 4
 }
 
 // Query sends a prompt to available LLM providers and returns the first successful response.
@@ -124,24 +151,53 @@ func (r *Router) Query(ctx context.Context, messages []provider.Message, tempera
 			providerName = fmt.Sprintf("Provider %d", i+1)
 		}
 
+		// Check all rate limits
 		if !provider.HasRemainingRequests(ctx) {
 			routerError.Errors = append(routerError.Errors, ProviderError{
 				ProviderName: providerName,
-				Error:        fmt.Errorf("no remaining requests"),
+				Error:        fmt.Errorf("daily request limit exceeded"),
+			})
+			continue
+		}
+
+		if !provider.HasRemainingRequestsPerMinute(ctx) {
+			routerError.Errors = append(routerError.Errors, ProviderError{
+				ProviderName: providerName,
+				Error:        fmt.Errorf("requests per minute limit exceeded"),
+			})
+			continue
+		}
+
+		// Estimate tokens for the request (rough approximation)
+		estimatedTokens := estimateTokens(messages)
+		if !provider.HasRemainingTokensPerMinute(ctx, estimatedTokens) {
+			routerError.Errors = append(routerError.Errors, ProviderError{
+				ProviderName: providerName,
+				Error:        fmt.Errorf("tokens per minute limit exceeded"),
 			})
 			continue
 		}
 
 		result, err := provider.QueryWithOptions(ctx, providerMessages, options)
-		if err == nil {
-			return result.Content, result.Model, nil
+		if err != nil {
+			// Collect the error
+			routerError.Errors = append(routerError.Errors, ProviderError{
+				ProviderName: providerName,
+				Error:        err,
+			})
+			continue
 		}
 
-		// Collect the error
-		routerError.Errors = append(routerError.Errors, ProviderError{
-			ProviderName: providerName,
-			Error:        err,
-		})
+		// Check for empty response and treat as error
+		if result.Content == "" {
+			routerError.Errors = append(routerError.Errors, ProviderError{
+				ProviderName: providerName,
+				Error:        fmt.Errorf("empty response received"),
+			})
+			continue
+		}
+
+		return result.Content, result.Model, nil
 	}
 
 	if len(routerError.Errors) == 0 {
@@ -183,24 +239,53 @@ func (r *Router) QueryWithOptions(ctx context.Context, messages []provider.Messa
 			providerName = fmt.Sprintf("Provider %d", i+1)
 		}
 
+		// Check all rate limits
 		if !provider.HasRemainingRequests(ctx) {
 			routerError.Errors = append(routerError.Errors, ProviderError{
 				ProviderName: providerName,
-				Error:        fmt.Errorf("no remaining requests"),
+				Error:        fmt.Errorf("daily request limit exceeded"),
+			})
+			continue
+		}
+
+		if !provider.HasRemainingRequestsPerMinute(ctx) {
+			routerError.Errors = append(routerError.Errors, ProviderError{
+				ProviderName: providerName,
+				Error:        fmt.Errorf("requests per minute limit exceeded"),
+			})
+			continue
+		}
+
+		// Estimate tokens for the request (rough approximation)
+		estimatedTokens := estimateTokens(messages)
+		if !provider.HasRemainingTokensPerMinute(ctx, estimatedTokens) {
+			routerError.Errors = append(routerError.Errors, ProviderError{
+				ProviderName: providerName,
+				Error:        fmt.Errorf("tokens per minute limit exceeded"),
 			})
 			continue
 		}
 
 		result, err := provider.QueryWithOptions(ctx, providerMessages, options)
-		if err == nil {
-			return result, nil
+		if err != nil {
+			// Collect the error
+			routerError.Errors = append(routerError.Errors, ProviderError{
+				ProviderName: providerName,
+				Error:        err,
+			})
+			continue
 		}
 
-		// Collect the error
-		routerError.Errors = append(routerError.Errors, ProviderError{
-			ProviderName: providerName,
-			Error:        err,
-		})
+		// Check for empty response and treat as error
+		if result.Content == "" {
+			routerError.Errors = append(routerError.Errors, ProviderError{
+				ProviderName: providerName,
+				Error:        fmt.Errorf("empty response received"),
+			})
+			continue
+		}
+
+		return result, nil
 	}
 
 	if len(routerError.Errors) == 0 {
@@ -215,7 +300,10 @@ func (r *Router) QueryWithOptions(ctx context.Context, messages []provider.Messa
 // before actually making them.
 func (r *Router) HasRemainingRequests(ctx context.Context) bool {
 	for _, provider := range r.providers {
-		if provider.HasRemainingRequests(ctx) {
+		if provider.HasRemainingRequests(ctx) &&
+			provider.HasRemainingRequestsPerMinute(ctx) {
+			// For token limits, we need to estimate tokens, but we don't have messages here
+			// So we'll just check if the provider has any daily and per-minute capacity
 			return true
 		}
 	}

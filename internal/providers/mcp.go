@@ -16,15 +16,21 @@ import (
 // FunctionCallingProvider implements the Provider interface for LLM APIs that support function calling
 // This provider can work with OpenAI, Anthropic, or any other LLM API that supports the OpenAI function calling format
 type FunctionCallingProvider struct {
-	apiKey           string
-	url              string
-	timeout          time.Duration
-	client           httpclient.Client
-	models           []string
-	maxDailyRequests int
-	requestsToday    int
-	lastReset        time.Time
-	toolExecutor     ToolExecutor
+	apiKey               string
+	url                  string
+	timeout              time.Duration
+	client               httpclient.Client
+	models               []string
+	maxDailyRequests     int
+	maxRequestsPerMinute int
+	maxTokensPerMinute   int
+	rank                 int
+	requestsToday        int
+	requestsThisMinute   int
+	tokensThisMinute     int
+	lastReset            time.Time
+	lastMinuteReset      time.Time
+	toolExecutor         ToolExecutor
 }
 
 // ToolExecutor interface for executing tool calls
@@ -36,17 +42,24 @@ type ToolExecutor interface {
 var _ provider.Provider = (*FunctionCallingProvider)(nil)
 
 // newFunctionCallingProvider creates a new function calling provider
-func newFunctionCallingProvider(apiKey string, url string, timeout time.Duration, models []string, httpClient httpclient.Client, maxDailyRequests int, toolExecutor ToolExecutor) (provider.Provider, error) {
+func newFunctionCallingProvider(apiKey string, url string, timeout time.Duration, models []string, httpClient httpclient.Client, maxDailyRequests, maxRequestsPerMinute, maxTokensPerMinute, rank int, toolExecutor ToolExecutor) (provider.Provider, error) {
+	now := time.Now()
 	return &FunctionCallingProvider{
-		url:              url,
-		apiKey:           apiKey,
-		timeout:          timeout,
-		models:           models,
-		client:           httpClient,
-		maxDailyRequests: maxDailyRequests,
-		requestsToday:    0,
-		lastReset:        time.Now().Truncate(24 * time.Hour),
-		toolExecutor:     toolExecutor,
+		url:                  url,
+		apiKey:               apiKey,
+		timeout:              timeout,
+		models:               models,
+		client:               httpClient,
+		maxDailyRequests:     maxDailyRequests,
+		maxRequestsPerMinute: maxRequestsPerMinute,
+		maxTokensPerMinute:   maxTokensPerMinute,
+		rank:                 rank,
+		requestsToday:        0,
+		requestsThisMinute:   0,
+		tokensThisMinute:     0,
+		lastReset:            now.Truncate(24 * time.Hour),
+		lastMinuteReset:      now.Truncate(time.Minute),
+		toolExecutor:         toolExecutor,
 	}, nil
 }
 
@@ -205,7 +218,9 @@ func (f *FunctionCallingProvider) makeRequest(ctx context.Context, requestBody m
 		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
+	// Update rate limiting counters
 	f.requestsToday++
+	f.requestsThisMinute++
 
 	var result struct {
 		Choices []struct {
@@ -243,7 +258,39 @@ func (f *FunctionCallingProvider) Close() {
 
 // HasRemainingRequests checks if the provider has remaining requests
 func (f *FunctionCallingProvider) HasRemainingRequests(ctx context.Context) bool {
-	return f.requestsToday < f.maxDailyRequests
+	// Reset daily counter if needed
+	if time.Since(f.lastReset) > 24*time.Hour {
+		f.requestsToday = 0
+		f.lastReset = time.Now().Truncate(24 * time.Hour)
+	}
+	return f.maxDailyRequests == 0 || f.requestsToday < f.maxDailyRequests
+}
+
+// HasRemainingRequestsPerMinute checks if the provider has remaining requests per minute
+func (f *FunctionCallingProvider) HasRemainingRequestsPerMinute(ctx context.Context) bool {
+	// Reset minute counter if needed
+	if time.Since(f.lastMinuteReset) > time.Minute {
+		f.requestsThisMinute = 0
+		f.tokensThisMinute = 0
+		f.lastMinuteReset = time.Now().Truncate(time.Minute)
+	}
+	return f.maxRequestsPerMinute == 0 || f.requestsThisMinute < f.maxRequestsPerMinute
+}
+
+// HasRemainingTokensPerMinute checks if the provider has remaining tokens per minute
+func (f *FunctionCallingProvider) HasRemainingTokensPerMinute(ctx context.Context, estimatedTokens int) bool {
+	// Reset minute counter if needed
+	if time.Since(f.lastMinuteReset) > time.Minute {
+		f.requestsThisMinute = 0
+		f.tokensThisMinute = 0
+		f.lastMinuteReset = time.Now().Truncate(time.Minute)
+	}
+	return f.maxTokensPerMinute == 0 || (f.tokensThisMinute+estimatedTokens) <= f.maxTokensPerMinute
+}
+
+// GetRank returns the provider's rank
+func (f *FunctionCallingProvider) GetRank() int {
+	return f.rank
 }
 
 // Name returns the name of the provider

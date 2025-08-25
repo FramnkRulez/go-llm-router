@@ -80,6 +80,9 @@ type Provider interface {
 	QueryWithOptions(ctx context.Context, messages []Message, options QueryOptions) (*QueryResult, error)
 
 	HasRemainingRequests(ctx context.Context) bool
+	HasRemainingRequestsPerMinute(ctx context.Context) bool
+	HasRemainingTokensPerMinute(ctx context.Context, estimatedTokens int) bool
+	GetRank() int
 	Close()
 
 	// Name returns the name of the provider for error reporting
@@ -88,9 +91,12 @@ type Provider interface {
 
 // Config holds common configuration for providers
 type Config struct {
-	APIKey           string
-	Models           []string
-	MaxDailyRequests int
-	Timeout          time.Duration
-	HTTPClient       httpclient.Client
+	APIKey               string
+	Models               []string
+	MaxDailyRequests     int
+	MaxRequestsPerMinute int
+	MaxTokensPerMinute   int
+	Rank                 int // Higher rank = higher priority (0 is lowest)
+	Timeout              time.Duration
+	HTTPClient           httpclient.Client
 }

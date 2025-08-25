@@ -51,29 +51,38 @@ type ToolExecutor = providers.ToolExecutor
 
 // GeminiConfig holds configuration for creating a Gemini provider
 type GeminiConfig struct {
-	APIKey       string
-	Models       []string
-	MaxDailyReqs int
+	APIKey               string
+	Models               []string
+	MaxDailyReqs         int
+	MaxRequestsPerMinute int
+	MaxTokensPerMinute   int
+	Rank                 int
 }
 
 // OpenRouterConfig holds configuration for creating an OpenRouter provider
 type OpenRouterConfig struct {
-	APIKey       string
-	Models       []string
-	MaxDailyReqs int
-	Referer      string
-	XTitle       string
-	Timeout      time.Duration
+	APIKey               string
+	Models               []string
+	MaxDailyReqs         int
+	MaxRequestsPerMinute int
+	MaxTokensPerMinute   int
+	Rank                 int
+	Referer              string
+	XTitle               string
+	Timeout              time.Duration
 }
 
 // FunctionCallingConfig holds configuration for creating a function calling provider
 type FunctionCallingConfig struct {
-	APIKey       string
-	URL          string
-	Models       []string
-	MaxDailyReqs int
-	Timeout      time.Duration
-	ToolExecutor ToolExecutor
+	APIKey               string
+	URL                  string
+	Models               []string
+	MaxDailyReqs         int
+	MaxRequestsPerMinute int
+	MaxTokensPerMinute   int
+	Rank                 int
+	Timeout              time.Duration
+	ToolExecutor         ToolExecutor
 }
 
 // NewGeminiProvider creates a new Gemini provider with the given configuration
@@ -82,6 +91,9 @@ func NewGeminiProvider(config GeminiConfig) (provider.Provider, error) {
 		config.APIKey,
 		config.Models,
 		config.MaxDailyReqs,
+		config.MaxRequestsPerMinute,
+		config.MaxTokensPerMinute,
+		config.Rank,
 	)
 }
 
@@ -98,6 +110,9 @@ func NewOpenRouterProvider(config OpenRouterConfig) (provider.Provider, error) {
 		config.XTitle,
 		httpClient,
 		config.MaxDailyReqs,
+		config.MaxRequestsPerMinute,
+		config.MaxTokensPerMinute,
+		config.Rank,
 	)
 }
 
@@ -112,6 +127,9 @@ func NewFunctionCallingProvider(config FunctionCallingConfig) (provider.Provider
 		config.Models,
 		httpClient,
 		config.MaxDailyReqs,
+		config.MaxRequestsPerMinute,
+		config.MaxTokensPerMinute,
+		config.Rank,
 		config.ToolExecutor,
 	)
 }
