@@ -227,6 +227,7 @@ func (g *GeminiProvider) QueryWithOptions(ctx context.Context, messages []provid
 		// Make the request
 		resp, err := g.client.Models.GenerateContent(ctx, model, genaiMessages, config)
 		if err != nil {
+			logGeminiError(model, err)
 			continue
 		}
 
@@ -359,4 +360,13 @@ func (g *GeminiProvider) GetRank() int {
 // Name returns the name of the provider
 func (g *GeminiProvider) Name() string {
 	return "Gemini"
+}
+
+func logGeminiError(model string, err error) {
+	if apiErr, ok := err.(genai.APIError); ok {
+		log.Printf("[gemini] API error model=%s code=%d status=%s msg=%s details=%v",
+			model, apiErr.Code, apiErr.Status, apiErr.Message, apiErr.Details)
+		return
+	}
+	log.Printf("[gemini] raw error model=%s type=%T err=%v", model, err, err)
 }
